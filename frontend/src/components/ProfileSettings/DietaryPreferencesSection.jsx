@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Info, Utensils, CheckCircle2 } from 'lucide-react';
 import { ProfileInfoTooltip } from './ProfileInfoTooltip';
+import { useAuth } from '../../AuthProvider';
 
 const mealPreferenceOptions = [
   "Low Sodium", "Low Sugar", "High Protein", "High Fiber", "Gluten-Free", "Dairy-Free"
@@ -18,39 +19,31 @@ const dietTypes = [
 ];
 
 export const DietaryPreferencesSection = () => {
-  const [dietType, setDietType] = useState("regular");
-  const [mealPreferences, setMealPreferences] = useState([]);
-  const [original, setOriginal] = useState({});
+  const { user, updateUserProfile } = useAuth();
+  const cachedProfile = user?.profile;
+
+  const [dietType, setDietType] = useState(cachedProfile?.diet_type || "regular");
+  const [mealPreferences, setMealPreferences] = useState(cachedProfile?.meal_preference || []);
+  const [original, setOriginal] = useState({
+    dietType: cachedProfile?.diet_type || "regular",
+    mealPreferences: cachedProfile?.meal_preference || []
+  });
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [showTooltip, setShowTooltip] = useState(false);
 
+  // Sync with cached profile when it changes
   useEffect(() => {
-    fetch('/api/profile', { credentials: 'include' })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        return res.json();
-      })
-      .then(data => {
-        setDietType(data.profile.diet_type || "regular");
-        setMealPreferences(data.profile.meal_preference || []);
-        setOriginal({
-          dietType: data.profile.diet_type || "regular",
-          mealPreferences: data.profile.meal_preference || []
-        });
-        setFetchError(null);
-      })
-      .catch(err => {
-        setFetchError('Could not load profile.');
-        setDietType("regular");
-        setMealPreferences([]);
-        setOriginal({
-          dietType: "regular",
-          mealPreferences: []
-        });
+    if (cachedProfile) {
+      setDietType(cachedProfile.diet_type || "regular");
+      setMealPreferences(cachedProfile.meal_preference || []);
+      setOriginal({
+        dietType: cachedProfile.diet_type || "regular",
+        mealPreferences: cachedProfile.meal_preference || []
       });
-  }, []);
+    }
+  }, [cachedProfile]);
 
   const handleDietTypeChange = (e) => {
     setDietType(e.target.value);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useEffect } from 'react';
 import { format } from 'date-fns';
@@ -67,46 +67,48 @@ const NutritionChart = ({ macroData = [], start, end }) => {
     return format(new Date(Number(year), Number(month) - 1, Number(day)), 'MMM d, yyyy');
   }
 
-  // Compute average macro distribution as percent of total macro calories
-  let totalProtein = 0, totalCarbs = 0, totalFat = 0;
-  let days = 0;
-  macroData.forEach(day => {
-    totalProtein += day.protein || 0;
-    totalCarbs += day.carbs || 0;
-    totalFat += day.fat || 0;
-    days++;
-  });
-  // Avoid division by zero
-  const avgProtein = days ? totalProtein / days : 0;
-  const avgCarbs = days ? totalCarbs / days : 0;
-  const avgFat = days ? totalFat / days : 0;
-  // Convert to kcal
-  const proteinKcal = avgProtein * 4;
-  const carbsKcal = avgCarbs * 4;
-  const fatKcal = avgFat * 9;
-  const totalKcal = proteinKcal + carbsKcal + fatKcal;
-  // Calculate percentages
-  const macroDistributionData = totalKcal > 0 ? [
-    { name: 'Protein', value: Math.round((proteinKcal / totalKcal) * 100), color: '#4CAF50' },
-    { name: 'Carbs', value: Math.round((carbsKcal / totalKcal) * 100), color: '#2196F3' },
-    { name: 'Fat', value: Math.round((fatKcal / totalKcal) * 100), color: '#FFC107' },
-  ] : [
-    { name: 'Protein', value: 0, color: '#4CAF50' },
-    { name: 'Carbs', value: 0, color: '#2196F3' },
-    { name: 'Fat', value: 0, color: '#FFC107' },
-  ];
+  // Compute average macro distribution as percent of total macro calories (memoized)
+  const macroDistributionData = useMemo(() => {
+    let totalProtein = 0, totalCarbs = 0, totalFat = 0;
+    let days = 0;
+    macroData.forEach(day => {
+      totalProtein += day.protein || 0;
+      totalCarbs += day.carbs || 0;
+      totalFat += day.fat || 0;
+      days++;
+    });
+    // Avoid division by zero
+    const avgProtein = days ? totalProtein / days : 0;
+    const avgCarbs = days ? totalCarbs / days : 0;
+    const avgFat = days ? totalFat / days : 0;
+    // Convert to kcal
+    const proteinKcal = avgProtein * 4;
+    const carbsKcal = avgCarbs * 4;
+    const fatKcal = avgFat * 9;
+    const totalKcal = proteinKcal + carbsKcal + fatKcal;
+    // Calculate percentages
+    return totalKcal > 0 ? [
+      { name: 'Protein', value: Math.round((proteinKcal / totalKcal) * 100), color: '#4CAF50' },
+      { name: 'Carbs', value: Math.round((carbsKcal / totalKcal) * 100), color: '#2196F3' },
+      { name: 'Fat', value: Math.round((fatKcal / totalKcal) * 100), color: '#FFC107' },
+    ] : [
+      { name: 'Protein', value: 0, color: '#4CAF50' },
+      { name: 'Carbs', value: 0, color: '#2196F3' },
+      { name: 'Fat', value: 0, color: '#FFC107' },
+    ];
+  }, [macroData]);
 
-  const renderPercentLabel = ({
+  const renderPercentLabel = useCallback(({
     cx, cy, midAngle, innerRadius, outerRadius, percent, fill
   }) => {
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.7;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  
+
     // Only show label if the slice is big enough
     if (percent < 0.08) return null;
-  
+
     return (
       <g>
         <rect
@@ -134,7 +136,7 @@ const NutritionChart = ({ macroData = [], start, end }) => {
         </text>
       </g>
     );
-  };
+  }, []);
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">

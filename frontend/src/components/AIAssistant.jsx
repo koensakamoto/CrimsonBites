@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { SendIcon, BotIcon } from "lucide-react"
 
 // Utility to get local date string in YYYY-MM-DD format
@@ -154,14 +154,14 @@ const AIAssistant = ({
         }
     }
 
-    const formatTime = (timestamp) => {
-        return new Date(timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+    const formatTime = useCallback((timestamp) => {
+        return new Date(timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
         });
-    };
+    }, []);
 
-    const clearChat = () => {
+    const clearChat = useCallback(() => {
         setChatHistory([
             {
                 id: '1',
@@ -170,10 +170,10 @@ const AIAssistant = ({
                 timestamp: new Date()
             },
         ]);
-    };
+    }, []);
 
-    // Suggested prompts based on context
-    const getSuggestedPrompts = () => {
+    // Suggested prompts based on context (memoized)
+    const suggestedPrompts = useMemo(() => {
         const basePrompts = [
             "How many calories have I eaten today?",
             "What should I eat for lunch?",
@@ -190,7 +190,7 @@ const AIAssistant = ({
         }
 
         return basePrompts.slice(0, 4);
-    };
+    }, [diningHall, mealType]);
 
     return (
         <div className={`bg-white rounded-lg shadow ${isMobile ? '' : 'h-100'}`}>
@@ -262,7 +262,7 @@ const AIAssistant = ({
                 <div className="px-4 pb-2">
                     <p className="text-xs text-gray-500 mb-2">Try asking:</p>
                     <div className="space-y-1">
-                        {getSuggestedPrompts().slice(0, 2).map((prompt, index) => (
+                        {suggestedPrompts.slice(0, 2).map((prompt, index) => (
                             <button
                                 key={index}
                                 onClick={() => setQuery(prompt)}

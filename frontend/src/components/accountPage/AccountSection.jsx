@@ -8,15 +8,16 @@ export const AccountSection = () => {
   const { user, logout, refetchProfile, updateUserProfile, updateUserEmail } = useAuth();
   const fetchWithAuth = useFetchWithAuth();
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  
-  const [image, setImage] = useState('');
+
+  // Initialize state from cached user data in AuthProvider
+  const [name, setName] = useState(user?.profile?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [image, setImage] = useState(user?.profile?.image || '');
   const [editingName, setEditingName] = useState(false);
   const [editingEmail, setEditingEmail] = useState(false);
   const [editingPassword, setEditingPassword] = useState(false);
-  const [tempName, setTempName] = useState('');
-  const [tempEmail, setTempEmail] = useState('');  
+  const [tempName, setTempName] = useState(user?.profile?.name || '');
+  const [tempEmail, setTempEmail] = useState(user?.email || '');
   const [tempImage, setTempImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [imageLoading, setImageLoading] = useState(false);
@@ -31,7 +32,8 @@ export const AccountSection = () => {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
-  const [loading, setLoading] = useState(true);
+  // No loading state needed since we use cached data
+  const [loading, setLoading] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
   // Password fields
@@ -60,32 +62,16 @@ export const AccountSection = () => {
     };
   }, []);
 
+  // Sync state when user data changes (e.g., after profile updates elsewhere)
   useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await fetchWithAuth('/api/profile');
-        if (error || !data) throw new Error('Failed to fetch profile');
-        setName(data.profile.name || '');
-        setImage(data.profile.image || '');
-        setTempName(data.profile.name || '');
-        setPreviewImage('');
-        setTempImage(null);
-      } catch (err) {
-        console.error('Could not load account info:', err);
-        // Set a general error state that can be displayed to user
-        setNameError('Failed to load account information');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, []);
-
-  useEffect(() => {
+    if (user?.profile) {
+      setName(user.profile.name || '');
+      setImage(user.profile.image || '');
+      setTempName(user.profile.name || '');
+    }
     if (user?.email) {
-      setTempEmail(user.email);
       setEmail(user.email);
+      setTempEmail(user.email);
     }
   }, [user]);
 

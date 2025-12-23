@@ -8,7 +8,31 @@ import { PlusCircleIcon, CalendarIcon, BuildingIcon, ClockIcon, UtensilsIcon, Ar
 import NutrientTracker from './NutrientTracker'
 import { useFetchWithAuth, useAuth } from '../AuthProvider'
 
-const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, clearItems, date, setDate, onSavePlate }) => {
+const Dashboard = ({
+  addToTracker,
+  trackedItems,
+  setTrackedItems,
+  removeItem,
+  clearItems,
+  date,
+  setDate,
+  onSavePlate,
+  // Filter state from App.jsx for navigation persistence
+  diningHall,
+  setDiningHall,
+  mealType,
+  setMealType,
+  foodStations,
+  setFoodStations,
+  diningHalls,
+  setDiningHalls,
+  mealTypesByHall,
+  setMealTypesByHall,
+  cachedFoodParams,
+  setCachedFoodParams,
+  cachedPlateDate,
+  setCachedPlateDate
+}) => {
 
   // Helper function to safely parse nutrient values
   const parseNutrient = useCallback((value) => {
@@ -82,13 +106,9 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
   }, []);
 
-  const [diningHall, setDiningHall] = useState("")
-  const [mealType, setMealType] = useState("")
-  const [foodStations, setFoodStations] = useState([])
+  // Local state for transient UI states only
   const [foodStationsLoading, setFoodStationsLoading] = useState(false)
   const [isCustomMealFormOpen, setIsCustomMealFormOpen] = useState(false)
-  const [diningHalls, setDiningHalls] = useState([])
-  const [mealTypesByHall, setMealTypesByHall] = useState({})
   const [plateLoading, setPlateLoading] = useState(false)
   const [plateSaving, setPlateSaving] = useState(false)
 
@@ -106,7 +126,19 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
   // Fetch food stations when all filters are selected
   useEffect(() => {
     if (!date || !diningHall || !mealType) {
-      setFoodStations([]);
+      // Only clear if we don't have matching cached data
+      if (!cachedFoodParams) {
+        setFoodStations([]);
+      }
+      setFoodStationsLoading(false);
+      return;
+    }
+
+    const dateStr = getLocalDateString(date);
+    const currentParams = `${dateStr}-${diningHall}-${mealType}`;
+
+    // Skip fetch if we already have cached data for these exact params
+    if (cachedFoodParams === currentParams && foodStations.length > 0) {
       setFoodStationsLoading(false);
       return;
     }
@@ -116,7 +148,7 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
     const params = new URLSearchParams({
       dining_hall: diningHall,
       meal_name: mealType,
-      date: getLocalDateString(date),
+      date: dateStr,
     });
 
     fetch(`/foods?${params}`, { signal: controller.signal })
@@ -127,11 +159,13 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
       .then((data) => {
         const stations = transformFoodData(data);
         setFoodStations(stations);
+        setCachedFoodParams(currentParams);
       })
       .catch((err) => {
         if (err.name !== 'AbortError') {
           console.error('Failed to fetch foods:', err);
           setFoodStations([]);
+          setCachedFoodParams(null);
         }
       })
       .finally(() => {
@@ -139,7 +173,7 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
       });
 
     return () => controller.abort();
-  }, [diningHall, date, mealType, transformFoodData]);
+  }, [diningHall, date, mealType, transformFoodData, cachedFoodParams, foodStations.length, setCachedFoodParams, getLocalDateString, setFoodStations]);
 
   // Load plate on date change
   useEffect(() => {
@@ -149,11 +183,19 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
       return;
     }
     if (!date) return;
-    
+
+    const dateStr = getLocalDateString(date);
+    const plateKey = `${user?.id || user?._id || 'anon'}-${dateStr}`;
+
+    // Skip fetch if we already loaded for this user+date
+    if (cachedPlateDate === plateKey) {
+      setPlateLoading(false);
+      return;
+    }
+
     const loadPlateForDate = async () => {
       setPlateLoading(true);
       try {
-        const dateStr = getLocalDateString(date);
         const { data } = await fetchWithAuth(`/api/plate?date=${dateStr}`);
         if (data && data.items && data.items.length > 0) {
           // Fetch all foods for this date (from all dining halls) to match saved items
@@ -188,6 +230,7 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
         } else {
           setTrackedItems([]);
         }
+        setCachedPlateDate(plateKey);
       } catch (err) {
         console.error('Failed to load plate:', err);
         setTrackedItems([]);
@@ -196,7 +239,7 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
       }
     };
     loadPlateForDate();
-  }, [date, user]); // Removed allStations from dependencies
+  }, [date, user, cachedPlateDate, setCachedPlateDate, getLocalDateString, fetchWithAuth, transformFoodData, setTrackedItems]);
 
   const handleSavePlate = async () => {
     setPlateSaving(true);
@@ -436,7 +479,9 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
           setDate={setDate}
           mealType={mealType}
           setMealType={setMealType}
-          // Pass callback to receive available options
+          // Pass cached state to avoid refetching
+          cachedDiningHalls={diningHalls}
+          cachedMealTypesByHall={mealTypesByHall}
           onDataUpdate={handleDataUpdate}
         />
       </div>
@@ -479,7 +524,7 @@ const Dashboard = ({ addToTracker, trackedItems, setTrackedItems, removeItem, cl
       
       {/* Content with Progressive Disclosure */}
       <div className="space-y-4">
-        {plateLoading && (
+        {plateLoading && diningHall && mealType && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <LoadingSpinner message="Loading your saved meals..." size="sm" />
           </div>

@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Info, Lock, Unlock, CheckCircle2 } from 'lucide-react';
 import { ProfileInfoTooltip } from './ProfileInfoTooltip';
+import { useAuth } from '../../AuthProvider';
 
 export const MacroTargetsSection = ({ energyTarget, refreshEnergyTarget, triggerProfileRefresh }) => {
+  const { user, updateUserProfile } = useAuth();
+  const cachedProfile = user?.profile;
+
   const [showTooltip, setShowTooltip] = useState(false);
-  const [proteinRatio, setProteinRatio] = useState(29);
-  const [carbRatio, setCarbRatio] = useState(58);
-  const [fatRatio, setFatRatio] = useState(12);
+  const [proteinRatio, setProteinRatio] = useState(cachedProfile?.protein_ratio ?? 29);
+  const [carbRatio, setCarbRatio] = useState(cachedProfile?.carb_ratio ?? 58);
+  const [fatRatio, setFatRatio] = useState(cachedProfile?.fat_ratio ?? 12);
   const baseEnergyTarget = energyTarget;
   const [proteinLocked, setProteinLocked] = useState(false);
   const [carbLocked, setCarbLocked] = useState(false);
@@ -107,31 +111,28 @@ export const MacroTargetsSection = ({ energyTarget, refreshEnergyTarget, trigger
       setFatLocked(!fatLocked);
     }
   };
-  const [original, setOriginal] = useState({});
+  const [original, setOriginal] = useState({
+    protein_ratio: cachedProfile?.protein_ratio ?? 30,
+    carb_ratio: cachedProfile?.carb_ratio ?? 50,
+    fat_ratio: cachedProfile?.fat_ratio ?? 20
+  });
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+
+  // Sync with cached profile when it changes
   useEffect(() => {
-    fetch('/api/profile', { credentials: 'include' })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        return res.json();
-      })
-      .then(data => {
-        setProteinRatio(data.profile.protein_ratio ?? 30);
-        setCarbRatio(data.profile.carb_ratio ?? 50);
-        setFatRatio(data.profile.fat_ratio ?? 20);
-        setOriginal({
-          protein_ratio: data.profile.protein_ratio ?? 30,
-          carb_ratio: data.profile.carb_ratio ?? 50,
-          fat_ratio: data.profile.fat_ratio ?? 20
-        });
-        setFetchError(null);
-      })
-      .catch(err => {
-        setFetchError('Could not load macro targets.');
+    if (cachedProfile) {
+      setProteinRatio(cachedProfile.protein_ratio ?? 30);
+      setCarbRatio(cachedProfile.carb_ratio ?? 50);
+      setFatRatio(cachedProfile.fat_ratio ?? 20);
+      setOriginal({
+        protein_ratio: cachedProfile.protein_ratio ?? 30,
+        carb_ratio: cachedProfile.carb_ratio ?? 50,
+        fat_ratio: cachedProfile.fat_ratio ?? 20
       });
-  }, []);
+    }
+  }, [cachedProfile]);
   useEffect(() => {
     if (refreshEnergyTarget) {
       refreshEnergyTarget();

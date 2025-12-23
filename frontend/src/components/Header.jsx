@@ -47,6 +47,7 @@ const Header = () => {
                 className="w-8 h-8"
                 width="32"
                 height="32"
+                loading="eager"
               />
             </div>
             <div>
@@ -121,6 +122,7 @@ const Header = () => {
                             src={getImageUrl(user.profile.image)}
                             alt="User Profile"
                             className="w-8 h-8 rounded-full object-cover"
+                            loading="lazy"
                           />
                         ) : (
                           <span className="text-white font-semibold text-sm">
@@ -181,6 +183,7 @@ const Header = () => {
                               src={getImageUrl(user.profile.image)}
                               alt="User Profile"
                               className="w-12 h-12 rounded-full object-cover"
+                              loading="lazy"
                             />
                           ) : (
                             <span className="text-white font-semibold text-lg">

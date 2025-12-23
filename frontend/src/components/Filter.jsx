@@ -10,16 +10,27 @@ const Filter = ({
     setDate,
     mealType,
     setMealType,
+    cachedDiningHalls = [],
+    cachedMealTypesByHall = {},
     onDataUpdate
 }) => {
-    const [diningHalls, setDiningHalls] = useState([])
-    const [mealTypesByHall, setMealTypesByHall] = useState({})
-    const [mealTypes, setMealTypes] = useState([])
+    // Use cached data as initial state to avoid flash on navigation
+    const [diningHalls, setDiningHalls] = useState(cachedDiningHalls)
+    const [mealTypesByHall, setMealTypesByHall] = useState(cachedMealTypesByHall)
+    const [mealTypes, setMealTypes] = useState(() => {
+        // Initialize mealTypes from cache if dining hall is selected
+        if (diningHall && cachedMealTypesByHall[diningHall]) {
+            return cachedMealTypesByHall[diningHall];
+        }
+        return [];
+    })
     const [isLoading, setIsLoading] = useState(false)
-    
+
     // Use refs to track if we're currently fetching to prevent duplicate calls
     const isFetchingRef = useRef(false)
     const lastFetchDateRef = useRef(null)
+    // Track if we've already loaded data for current date
+    const hasInitialData = useRef(cachedDiningHalls.length > 0)
 
     // Function to sort meal types in the correct order
     const sortMealTypes = useCallback((meals) => {
@@ -59,6 +70,14 @@ const Filter = ({
         const formattedDate = date.getFullYear() + '-' +
             String(date.getMonth() + 1).padStart(2, '0') + '-' +
             String(date.getDate()).padStart(2, '0');
+
+        // Skip fetch if we already have cached data and haven't fetched yet
+        // (this handles navigation back to Dashboard with existing data)
+        if (hasInitialData.current && diningHalls.length > 0) {
+            hasInitialData.current = false; // Only skip once
+            lastFetchDateRef.current = formattedDate;
+            return;
+        }
 
         // Prevent duplicate fetches
         if (isFetchingRef.current || lastFetchDateRef.current === formattedDate) {

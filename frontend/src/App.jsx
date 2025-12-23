@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,16 +9,18 @@ import HomeLayout from './components/HomeLayout'
 import Dashboard from './components/Dashboard'
 import Login from './components/Login'
 import NutrientTracker from './components/NutrientTracker'
-import ProfileSettings from "./components/ProfileSettings/ProfileSettings"
-import NutritionHistory from './components/nutritionHistory/NutritionHistory.jsx'
-import UserAccount from './components/accountPage/UserAccount'
 import Register from './components/Register'
 import ForgotPassword from './components/ForgotPassword'
 import ResetPassword from './components/ResetPassword'
 import AuthCallback from './components/AuthCallback'
 import PrivacyPolicy from './components/PrivacyPolicy'
-// import AIMealPlanner from './components/AIMealPlanner'
+import LoadingSpinner from './components/LoadingSpinner'
 import { useAuth } from './AuthProvider'
+
+// Lazy load heavy route components
+const ProfileSettings = lazy(() => import('./components/ProfileSettings/ProfileSettings'))
+const NutritionHistory = lazy(() => import('./components/nutritionHistory/NutritionHistory'))
+const UserAccount = lazy(() => import('./components/accountPage/UserAccount'))
 
 // Utility to get local date string in YYYY-MM-DD format
 function getLocalDateString(date) {
@@ -43,6 +45,21 @@ export default function App() {
   const { user, logout } = useAuth();
   const [trackedItems, setTrackedItems] = React.useState([])
   const [date, setDate] = React.useState(new Date())
+
+  // Dashboard filter state - lifted here to persist across navigation
+  const [diningHall, setDiningHall] = React.useState("")
+  const [mealType, setMealType] = React.useState("")
+  const [foodStations, setFoodStations] = React.useState([])
+  const [diningHalls, setDiningHalls] = React.useState([])
+  const [mealTypesByHall, setMealTypesByHall] = React.useState({})
+  // Track what params the cached foodStations is for
+  const [cachedFoodParams, setCachedFoodParams] = React.useState(null)
+  // Track which date's plate has been loaded to avoid refetching on navigation
+  const [cachedPlateDate, setCachedPlateDate] = React.useState(null)
+
+  // Nutrition history cache - persists across navigation, refreshes on plate save
+  const [nutritionHistoryCache, setNutritionHistoryCache] = React.useState(null)
+  const [nutritionHistoryVersion, setNutritionHistoryVersion] = React.useState(0)
   
   const addToTracker = (item, quantity = 1) => {
     const newItem = {
@@ -91,7 +108,8 @@ export default function App() {
       })
     });
     if (res.ok) {
-      // Plate saved successfully
+      // Invalidate nutrition history cache so it refetches on next visit
+      setNutritionHistoryVersion(v => v + 1)
     } else {
       console.error('Failed to save plate');
     }
@@ -145,6 +163,20 @@ export default function App() {
                   date={date}
                   setDate={setDate}
                   onSavePlate={handleSavePlate}
+                  diningHall={diningHall}
+                  setDiningHall={setDiningHall}
+                  mealType={mealType}
+                  setMealType={setMealType}
+                  foodStations={foodStations}
+                  setFoodStations={setFoodStations}
+                  diningHalls={diningHalls}
+                  setDiningHalls={setDiningHalls}
+                  mealTypesByHall={mealTypesByHall}
+                  setMealTypesByHall={setMealTypesByHall}
+                  cachedFoodParams={cachedFoodParams}
+                  setCachedFoodParams={setCachedFoodParams}
+                  cachedPlateDate={cachedPlateDate}
+                  setCachedPlateDate={setCachedPlateDate}
                 />
                 <div className="hidden lg:block lg:w-1/4">
                   <NutrientTracker
@@ -159,9 +191,9 @@ export default function App() {
             }
           />
           
-          <Route path="profile" element={<PrivateRoute><ProfileSettings /></PrivateRoute>} />
-          <Route path="account" element={<PrivateRoute><UserAccount /></PrivateRoute>} />
-          <Route path="history" element={<PrivateRoute><NutritionHistory /></PrivateRoute>} />
+          <Route path="profile" element={<PrivateRoute><Suspense fallback={<LoadingSpinner />}><ProfileSettings /></Suspense></PrivateRoute>} />
+          <Route path="account" element={<PrivateRoute><Suspense fallback={<LoadingSpinner />}><UserAccount /></Suspense></PrivateRoute>} />
+          <Route path="history" element={<PrivateRoute><Suspense fallback={<LoadingSpinner />}><NutritionHistory cache={nutritionHistoryCache} setCache={setNutritionHistoryCache} version={nutritionHistoryVersion} /></Suspense></PrivateRoute>} />
           {/* <Route path="ai-meal-planner" element={<PrivateRoute><AIMealPlanner /></PrivateRoute>} /> */}
           <Route
             path="*"

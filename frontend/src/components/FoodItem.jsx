@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, memo } from 'react'
 import {
   PlusIcon,
   MinusIcon,
@@ -9,7 +9,7 @@ import {
   ThermometerIcon,
 } from 'lucide-react'
 
-const FoodItem = ({ item, addToTracker }) => {
+const FoodItem = memo(({ item, addToTracker }) => {
   const [showDetails, setShowDetails] = useState(false)
   const [servings, setServings] = useState(1);
 
@@ -226,5 +226,8 @@ const FoodItem = ({ item, addToTracker }) => {
       )}
     </div>
   )
-}
+})
+
+FoodItem.displayName = 'FoodItem'
+
 export default FoodItem

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
     PieChart,
     Pie,
@@ -44,8 +44,8 @@ const NutrientTracker = ({ trackedItems, removeItem, clearItems, selectedDate, o
             return () => clearTimeout(timer);
         }
     }, [saveSuccess]);
-    // Calculate nutrition totals
-    const totals = trackedItems.reduce(
+    // Calculate nutrition totals (memoized)
+    const totals = useMemo(() => trackedItems.reduce(
         (acc, item) => {
             const qty = item.quantity || 1;
             return {
@@ -61,9 +61,10 @@ const NutrientTracker = ({ trackedItems, removeItem, clearItems, selectedDate, o
             carbs: 0,
             fat: 0,
         },
-    )
-    // Data for pie chart
-    const pieData = [
+    ), [trackedItems])
+
+    // Data for pie chart (memoized)
+    const pieData = useMemo(() => [
         {
             name: 'Protein',
             value: totals.protein * 4,
@@ -79,9 +80,10 @@ const NutrientTracker = ({ trackedItems, removeItem, clearItems, selectedDate, o
             value: totals.fat * 9,
             color: '#ed8936',
         }, // 9 calories per gram
-    ]
-    // Data for bar chart (% of daily recommended values)
-    const barData = [
+    ], [totals.protein, totals.carbs, totals.fat])
+
+    // Data for bar chart (% of daily recommended values) (memoized)
+    const barData = useMemo(() => [
         {
             name: 'Calories',
             percent: (totals.calories / 2000) * 100,
@@ -102,7 +104,7 @@ const NutrientTracker = ({ trackedItems, removeItem, clearItems, selectedDate, o
             percent: (totals.fat / 78) * 100,
             color: '#ed8936',
         },
-    ]
+    ], [totals.calories, totals.protein, totals.carbs, totals.fat])
     const handleSave = async () => {
         if (onSavePlate) {
             await onSavePlate();

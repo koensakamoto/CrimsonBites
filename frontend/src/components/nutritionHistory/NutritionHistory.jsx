@@ -15,22 +15,26 @@ import {
   WeightSkeleton 
 } from './SkeletonLoaders';
 
-export default function NutritionHistory() {
-  const [dateRange, setDateRange] = useState('last-week');
-  const [viewMode, setViewMode] = useState('daily');
+export default function NutritionHistory({ cache, setCache, version }) {
+  const [dateRange, setDateRange] = useState(cache?.dateRange || 'last-week');
+  const [viewMode, setViewMode] = useState(cache?.viewMode || 'daily');
+
+  // Check if cache is valid (same version and dateRange)
+  const isCacheValid = cache && cache.version === version && cache.dateRange === dateRange;
+
   // Progressive loading state management
   const [loadingState, setLoadingState] = useState({
-    summary: 'loading',      // loading | loaded | error
-    energyChart: 'loading',  // loading | loaded | error  
-    insights: 'loading',     // loading | loaded | error
-    weight: 'loading'        // loading | loaded | error
+    summary: isCacheValid ? 'loaded' : 'loading',
+    energyChart: isCacheValid ? 'loaded' : 'loading',
+    insights: isCacheValid ? 'loaded' : 'loading',
+    weight: isCacheValid ? 'loaded' : 'loading'
   });
 
-  // Data states
-  const [summaryData, setSummaryData] = useState(null);
-  const [macroData, setMacroData] = useState([]);
-  const [energyChartData, setEnergyChartData] = useState([]);
-  const [weightData, setWeightData] = useState([]);
+  // Data states - initialize from cache if valid
+  const [summaryData, setSummaryData] = useState(isCacheValid ? cache.summaryData : null);
+  const [macroData, setMacroData] = useState(isCacheValid ? cache.macroData : []);
+  const [energyChartData, setEnergyChartData] = useState(isCacheValid ? cache.energyChartData : []);
+  const [weightData, setWeightData] = useState(isCacheValid ? cache.weightData : []);
 
   // Error states
   const [summaryError, setSummaryError] = useState(null);
@@ -38,6 +42,11 @@ export default function NutritionHistory() {
   const [energyChartError, setEnergyChartError] = useState(null);
   const [weightError, setWeightError] = useState(null);
   const fetchWithAuth = useFetchWithAuth();
+
+  // Track the last fetched params to avoid redundant fetches
+  const [lastFetchedParams, setLastFetchedParams] = useState(
+    isCacheValid ? { dateRange, version } : null
+  );
 
   // Helper to update loading state
   const updateLoadingState = (section, status) => {
@@ -266,8 +275,13 @@ export default function NutritionHistory() {
     return `${formatDisplayDate(start)} - ${formatDisplayDate(end)}`;
   }
 
-  // Fetch nutrition summary (only when dateRange changes)
+  // Fetch nutrition summary (only when dateRange or version changes, skip if cached)
   useEffect(() => {
+    // Skip fetch if we already have data for this dateRange+version
+    if (lastFetchedParams?.dateRange === dateRange && lastFetchedParams?.version === version) {
+      return;
+    }
+
     const fetchSummary = async () => {
       updateLoadingState('summary', 'loading');
       setSummaryError(null);
@@ -281,7 +295,7 @@ export default function NutritionHistory() {
         if (profileRes.error) throw new Error(profileRes.error);
         if (energyRes.error) throw new Error(energyRes.error);
         if (summaryRes.error) throw new Error(summaryRes.error);
-        
+
         const macronutrients = profileRes.data;
         const { energy_target } = energyRes.data;
         const data = summaryRes.data;
@@ -364,54 +378,45 @@ export default function NutritionHistory() {
       }
     };
     fetchSummary();
-  }, [dateRangeBounds]);
+  }, [dateRangeBounds, version, lastFetchedParams]);
 
-  // Fetch macro data for insights (only when dateRange changes, NOT viewMode)
+  // Cache for food macros data to avoid duplicate API calls
+  const [rawFoodMacros, setRawFoodMacros] = useState(isCacheValid ? cache.rawFoodMacros : null);
+
+  // Fetch food macros data once (when dateRange or version changes, skip if cached)
   useEffect(() => {
-    const fetchMacroData = async () => {
+    // Skip fetch if we already have data for this dateRange+version
+    if (lastFetchedParams?.dateRange === dateRange && lastFetchedParams?.version === version) {
+      return;
+    }
+
+    const fetchFoodMacros = async () => {
       const { start, end } = dateRangeBounds;
       updateLoadingState('insights', 'loading');
-      setMacroError(null);
-      try {
-        const { data, error } = await fetchWithAuth(`/api/plate/food-macros?start_date=${start}&end_date=${end}`);
-        if (error) throw new Error(error);
-        if (!data) {
-          console.warn('No macro data received from API');
-          setMacroData([]);
-          return;
-        }
-        const foodMacros = data;
-        // Always use daily aggregation for nutrition insights
-        const aggregated = aggregateMacros(foodMacros, 'daily');
-        setMacroData(fillMissingDates(aggregated, start, end));
-        updateLoadingState('insights', 'loaded');
-      } catch (err) {
-        console.error('Failed to fetch macro data:', err);
-        setMacroError(err.message || 'Failed to load nutrition data');
-        setMacroData([]);
-        updateLoadingState('insights', 'error');
-      }
-    };
-    fetchMacroData();
-  }, [dateRangeBounds]);
-
-  // Fetch energy chart data (when dateRange OR viewMode changes)
-  useEffect(() => {
-    const fetchEnergyChartData = async () => {
-      const { start, end } = dateRangeBounds;
       updateLoadingState('energyChart', 'loading');
+      setMacroError(null);
       setEnergyChartError(null);
       try {
         const { data, error } = await fetchWithAuth(`/api/plate/food-macros?start_date=${start}&end_date=${end}`);
         if (error) throw new Error(error);
         if (!data) {
-          console.warn('No energy chart data received from API');
+          console.warn('No macro data received from API');
+          setRawFoodMacros([]);
+          setMacroData([]);
           setEnergyChartData([]);
+          updateLoadingState('insights', 'loaded');
+          updateLoadingState('energyChart', 'loaded');
           return;
         }
-        const foodMacros = data;
-        const aggregated = aggregateMacros(foodMacros, viewMode);
-        
+        setRawFoodMacros(data);
+
+        // Process macro data for insights (always daily)
+        const dailyAggregated = aggregateMacros(data, 'daily');
+        setMacroData(fillMissingDates(dailyAggregated, start, end));
+        updateLoadingState('insights', 'loaded');
+
+        // Process energy chart data based on current viewMode
+        const aggregated = aggregateMacros(data, viewMode);
         if (viewMode === 'daily') {
           setEnergyChartData(fillMissingDates(aggregated, start, end));
         } else if (viewMode === 'weekly') {
@@ -423,17 +428,43 @@ export default function NutritionHistory() {
         }
         updateLoadingState('energyChart', 'loaded');
       } catch (err) {
-        console.error('Failed to fetch energy chart data:', err);
+        console.error('Failed to fetch macro data:', err);
+        setMacroError(err.message || 'Failed to load nutrition data');
         setEnergyChartError(err.message || 'Failed to load energy chart data');
+        setMacroData([]);
         setEnergyChartData([]);
+        updateLoadingState('insights', 'error');
         updateLoadingState('energyChart', 'error');
       }
     };
-    fetchEnergyChartData();
-  }, [dateRangeBounds, viewMode]);
+    fetchFoodMacros();
+  }, [dateRangeBounds, version, lastFetchedParams]);
 
-  // Fetch weight data for chart (when dateRange changes)
+  // Re-process energy chart data when viewMode changes (no API call needed)
   useEffect(() => {
+    if (!rawFoodMacros) return;
+
+    const { start, end } = dateRangeBounds;
+    const aggregated = aggregateMacros(rawFoodMacros, viewMode);
+
+    if (viewMode === 'daily') {
+      setEnergyChartData(fillMissingDates(aggregated, start, end));
+    } else if (viewMode === 'weekly') {
+      setEnergyChartData(fillMissingWeeks(aggregated, start, end));
+    } else if (viewMode === 'monthly') {
+      setEnergyChartData(fillMissingMonths(aggregated, start, end));
+    } else {
+      setEnergyChartData(aggregated);
+    }
+  }, [viewMode, rawFoodMacros, dateRangeBounds]);
+
+  // Fetch weight data for chart (when dateRange or version changes, skip if cached)
+  useEffect(() => {
+    // Skip fetch if we already have data for this dateRange+version
+    if (lastFetchedParams?.dateRange === dateRange && lastFetchedParams?.version === version) {
+      return;
+    }
+
     const fetchWeightData = async () => {
       const { start, end } = dateRangeBounds;
       updateLoadingState('weight', 'loading');
@@ -451,7 +482,36 @@ export default function NutritionHistory() {
       }
     };
     fetchWeightData();
-  }, [dateRangeBounds]);
+  }, [dateRangeBounds, version, lastFetchedParams]);
+
+  // Update lastFetchedParams and save cache when all data is loaded
+  useEffect(() => {
+    const allLoaded = loadingState.summary === 'loaded' &&
+                      loadingState.energyChart === 'loaded' &&
+                      loadingState.insights === 'loaded' &&
+                      loadingState.weight === 'loaded';
+
+    if (allLoaded && (lastFetchedParams?.dateRange !== dateRange || lastFetchedParams?.version !== version)) {
+      setLastFetchedParams({ dateRange, version });
+      setCache({
+        version,
+        dateRange,
+        viewMode,
+        summaryData,
+        macroData,
+        energyChartData,
+        weightData,
+        rawFoodMacros
+      });
+    }
+  }, [loadingState, dateRange, version, summaryData, macroData, energyChartData, weightData, rawFoodMacros, viewMode, setCache, lastFetchedParams]);
+
+  // Update cache when viewMode changes (without triggering refetch)
+  useEffect(() => {
+    if (cache && cache.version === version && cache.dateRange === dateRange && cache.viewMode !== viewMode) {
+      setCache(prev => ({ ...prev, viewMode, energyChartData }));
+    }
+  }, [viewMode, energyChartData, cache, version, dateRange, setCache]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex justify-center items-center">

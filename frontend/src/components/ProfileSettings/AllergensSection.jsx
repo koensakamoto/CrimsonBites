@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import { AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { ProfileInfoTooltip } from './ProfileInfoTooltip';
+import { useAuth } from '../../AuthProvider';
 
 const commonAllergens = [
   { id: 'milk', label: 'Dairy' },
@@ -18,45 +19,34 @@ const otherSensitivities = [
 ];
 
 export const AllergensSection = () => {
-  const [selectedAllergens, setSelectedAllergens] = useState([]);
-  const [originalAllergens, setOriginalAllergens] = useState([]);
-  const [selectedSensitivities, setSelectedSensitivities] = useState([]);
-  const [originalSensitivities, setOriginalSensitivities] = useState([]);
-  const [allergyNotes, setAllergyNotes] = useState("");
-  const [originalNotes, setOriginalNotes] = useState("");
+  const { user, updateUserProfile } = useAuth();
+  const cachedProfile = user?.profile;
+
+  const [selectedAllergens, setSelectedAllergens] = useState(cachedProfile?.allergens || []);
+  const [originalAllergens, setOriginalAllergens] = useState(cachedProfile?.allergens || []);
+  const [selectedSensitivities, setSelectedSensitivities] = useState(cachedProfile?.food_sensitivities || []);
+  const [originalSensitivities, setOriginalSensitivities] = useState(cachedProfile?.food_sensitivities || []);
+  const [allergyNotes, setAllergyNotes] = useState(cachedProfile?.allergy_notes || "");
+  const [originalNotes, setOriginalNotes] = useState(cachedProfile?.allergy_notes || "");
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [showTooltip, setShowTooltip] = useState(false);
 
+  // Sync with cached profile when it changes
   useEffect(() => {
-    fetch('/api/profile', { credentials: 'include' })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        return res.json();
-      })
-      .then(data => {
-        const allergens = data.profile.allergens || [];
-        const sensitivities = data.profile.food_sensitivities || [];
-        const notes = data.profile.allergy_notes || "";
-        setSelectedAllergens(allergens);
-        setOriginalAllergens(allergens);
-        setSelectedSensitivities(sensitivities);
-        setOriginalSensitivities(sensitivities);
-        setAllergyNotes(notes);
-        setOriginalNotes(notes);
-        setFetchError(null);
-      })
-      .catch(err => {
-        setFetchError('Could not load profile.');
-        setSelectedAllergens([]);
-        setOriginalAllergens([]);
-        setSelectedSensitivities([]);
-        setOriginalSensitivities([]);
-        setAllergyNotes("");
-        setOriginalNotes("");
-      });
-  }, []);
+    if (cachedProfile) {
+      const allergens = cachedProfile.allergens || [];
+      const sensitivities = cachedProfile.food_sensitivities || [];
+      const notes = cachedProfile.allergy_notes || "";
+      setSelectedAllergens(allergens);
+      setOriginalAllergens(allergens);
+      setSelectedSensitivities(sensitivities);
+      setOriginalSensitivities(sensitivities);
+      setAllergyNotes(notes);
+      setOriginalNotes(notes);
+    }
+  }, [cachedProfile]);
 
   // Helper to compare arrays with normalization
   const normalizeArray = arr => arr.map(String).map(s => s.trim()).sort();

@@ -1,70 +1,85 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Info, CheckCircle2 } from 'lucide-react';
 import { ProfileInfoTooltip } from './ProfileInfoTooltip';
+import { useAuth } from '../../AuthProvider';
+
+// Helper to parse profile data into component state
+const parseProfileData = (profile) => {
+  let bday = { day: '', month: '', year: '' };
+  if (profile?.birthday) {
+    const [year, month, day] = profile.birthday.split('-');
+    bday = {
+      day: String(Number(day)),
+      month: String(Number(month)),
+      year: year
+    };
+  }
+
+  let heightFt = '';
+  let heightIn = '';
+  if (profile?.height) {
+    const totalInches = profile.height;
+    heightFt = Math.floor(totalInches / 12).toString();
+    heightIn = Math.round(totalInches % 12).toString();
+  }
+
+  return {
+    sex: profile?.sex || 'male',
+    birthday: bday,
+    heightFt,
+    heightIn,
+    weight: profile?.weight ? profile.weight.toFixed(1) : '',
+    weightGoal: profile?.weight_goal ? profile.weight_goal.toString() : '',
+    bodyFat: profile?.body_fat_percent?.toString() || '',
+    original: {
+      sex: profile?.sex || 'male',
+      birthday: profile?.birthday || '',
+      height: profile?.height || '',
+      weight: profile?.weight || '',
+      weight_goal: profile?.weight_goal || '',
+      body_fat_percent: profile?.body_fat_percent || '',
+    }
+  };
+};
 
 export const ProfileSection = ({ energyTarget, refreshEnergyTarget, triggerProfileRefresh }) => {
-  // State for profile fields
-  const [sex, setSex] = useState('male');
-  const [birthday, setBirthday] = useState({ day: '', month: '', year: '' });
-  const [heightFt, setHeightFt] = useState('');
-  const [heightIn, setHeightIn] = useState('');
-  const [weight, setWeight] = useState('');
-  const [weightGoal, setWeightGoal] = useState('');
-  const [bodyFat, setBodyFat] = useState('');
-  const [original, setOriginal] = useState({});
+  const { user, updateUserProfile } = useAuth();
+  const cachedProfile = user?.profile;
+  const initialData = parseProfileData(cachedProfile);
+  const hasInitialized = useRef(false);
+
+  // State for profile fields - initialize from cached data
+  const [sex, setSex] = useState(initialData.sex);
+  const [birthday, setBirthday] = useState(initialData.birthday);
+  const [heightFt, setHeightFt] = useState(initialData.heightFt);
+  const [heightIn, setHeightIn] = useState(initialData.heightIn);
+  const [weight, setWeight] = useState(initialData.weight);
+  const [weightGoal, setWeightGoal] = useState(initialData.weightGoal);
+  const [bodyFat, setBodyFat] = useState(initialData.bodyFat);
+  const [original, setOriginal] = useState(initialData.original);
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
 
-  // Fetch profile on mount
+  // Sync with cached profile when it changes (e.g., after login or refetch)
   useEffect(() => {
-    fetch('/api/profile', { credentials: 'include' })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        return res.json();
-      })
-      .then(data => {
-        setSex(data.profile.sex || 'male');
-        let bday = { day: '', month: '', year: '' };
-        if (data.profile.birthday) {
-          const [year, month, day] = data.profile.birthday.split('-');
-          bday = {
-            day: String(Number(day)),
-            month: String(Number(month)),
-            year: year
-          };
-        }
-        setBirthday(bday);
-        if (data.profile.height) {
-          const totalInches = data.profile.height;
-          setHeightFt(Math.floor(totalInches / 12).toString());
-          setHeightIn(Math.round(totalInches % 12).toString());
-        } else {
-          setHeightFt('');
-          setHeightIn('');
-        }
-        setWeight(data.profile.weight ? (data.profile.weight).toFixed(1) : '');
-        setWeightGoal(data.profile.weight_goal ? data.profile.weight_goal.toString() : '');
-        setBodyFat(data.profile.body_fat_percent?.toString() || '');
-        setOriginal({
-          sex: data.profile.sex || 'male',
-          birthday: data.profile.birthday || '',
-          height: data.profile.height || '',
-          weight: data.profile.weight || '',
-          weight_goal: data.profile.weight_goal || '',
-          body_fat_percent: data.profile.body_fat_percent || '',
-        });
-        setFetchError(null);
-        
-        // Clear any validation errors on successful load
-        setValidationErrors({});
-      })
-      .catch(err => {
-        setFetchError('Could not load profile.');
-      });
-  }, []);
+    if (cachedProfile && !hasInitialized.current) {
+      const data = parseProfileData(cachedProfile);
+      setSex(data.sex);
+      setBirthday(data.birthday);
+      setHeightFt(data.heightFt);
+      setHeightIn(data.heightIn);
+      setWeight(data.weight);
+      setWeightGoal(data.weightGoal);
+      setBodyFat(data.bodyFat);
+      setOriginal(data.original);
+      setFetchError(null);
+      setValidationErrors({});
+      hasInitialized.current = true;
+    }
+  }, [cachedProfile]);
 
   const checkShowSave = (newSex, newBirthday, newHeight, newWeight, newWeightGoal, newBodyFat) => {
     const hasChanges = (
@@ -394,6 +409,17 @@ export const ProfileSection = ({ energyTarget, refreshEnergyTarget, triggerProfi
       setShowSaveButton(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+
+      // Update cached profile in AuthProvider
+      updateUserProfile({
+        sex: body.sex,
+        birthday: body.birthday,
+        height: body.height,
+        weight: body.weight,
+        weight_goal: body.weight_goal,
+        body_fat_percent: body.body_fat_percent,
+      });
+
       if (refreshEnergyTarget) refreshEnergyTarget();
       if (triggerProfileRefresh) triggerProfileRefresh();
     } catch (err) {

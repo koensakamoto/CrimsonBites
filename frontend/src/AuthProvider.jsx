@@ -163,8 +163,13 @@ const updateUserEmail = (newEmail) => {
   }
 };
 
+// Get cached profile data without refetching
+const getCachedProfile = () => {
+  return user?.profile || null;
+};
+
 return (
-  <AuthContext.Provider value={{ user, login, logout, register, loading, error, clearError,  isAuthenticated: !!user, guestLogin, wasAuthenticated, refetchProfile, updateUserProfile, updateUserEmail }}>
+  <AuthContext.Provider value={{ user, login, logout, register, loading, error, clearError, isAuthenticated: !!user, guestLogin, wasAuthenticated, refetchProfile, updateUserProfile, updateUserEmail, getCachedProfile }}>
     {children}
   </AuthContext.Provider>
 );

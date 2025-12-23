@@ -12,6 +12,7 @@ openai
 anthropic
 authlib
 passlib
+bcrypt<4.1.0
 python-jose
 email-validator
 itsdangerous

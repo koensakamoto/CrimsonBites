@@ -1,13 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Info, Minimize, TrendingDown, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { ProfileInfoTooltip } from './ProfileInfoTooltip';
+import { useAuth } from '../../AuthProvider';
 
 export const WeightGoalRateSection = ({ energyTarget, refreshEnergyTarget, profileRefreshTrigger }) => {
-  const [rateOption, setRateOption] = useState('moderate');
-  const [customRate, setCustomRate] = useState('');
-  const [currentWeight, setCurrentWeight] = useState('');
-  const [weightGoal, setWeightGoal] = useState('');
-  const [original, setOriginal] = useState({});
+  const { user, updateUserProfile } = useAuth();
+  const cachedProfile = user?.profile;
+
+  const [rateOption, setRateOption] = useState(cachedProfile?.weight_goal_rate || 'moderate');
+  const [customRate, setCustomRate] = useState(cachedProfile?.weight_goal_custom_rate ? String(cachedProfile.weight_goal_custom_rate) : '');
+  const [currentWeight, setCurrentWeight] = useState(cachedProfile?.weight ? cachedProfile.weight.toString() : '');
+  const [weightGoal, setWeightGoal] = useState(cachedProfile?.weight_goal ? cachedProfile.weight_goal.toString() : '');
+  const [original, setOriginal] = useState({
+    rateOption: cachedProfile?.weight_goal_rate || 'moderate',
+    customRate: cachedProfile?.weight_goal_custom_rate ? String(cachedProfile.weight_goal_custom_rate) : '',
+    goalType: cachedProfile?.weight_goal_type || null,
+  });
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState(null);
@@ -49,48 +57,23 @@ export const WeightGoalRateSection = ({ energyTarget, refreshEnergyTarget, profi
     return [];
   }, [goalDirection]);
 
-  // Fetch profile data
-  const fetchProfileData = useCallback(() => {
-    fetch('/api/profile', { credentials: 'include' })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        return res.json();
-      })
-      .then(data => {
-        setCurrentWeight(data.profile.weight ? data.profile.weight.toString() : '');
-        setWeightGoal(data.profile.weight_goal ? data.profile.weight_goal.toString() : '');
-        setRateOption(data.profile.weight_goal_rate || 'moderate');
-        setCustomRate(data.profile.weight_goal_custom_rate ? String(data.profile.weight_goal_custom_rate) : '');
-        setOriginal({
-          rateOption: data.profile.weight_goal_rate || 'moderate',
-          customRate: data.profile.weight_goal_custom_rate ? String(data.profile.weight_goal_custom_rate) : '',
-          goalType: data.profile.weight_goal_type || null,
-        });
-        setFetchError(null);
-      })
-      .catch(err => {
-        setFetchError('Could not load weight goal info.');
+  // Sync with cached profile when it changes
+  useEffect(() => {
+    if (cachedProfile) {
+      setCurrentWeight(cachedProfile.weight ? cachedProfile.weight.toString() : '');
+      setWeightGoal(cachedProfile.weight_goal ? cachedProfile.weight_goal.toString() : '');
+      setRateOption(cachedProfile.weight_goal_rate || 'moderate');
+      setCustomRate(cachedProfile.weight_goal_custom_rate ? String(cachedProfile.weight_goal_custom_rate) : '');
+      setOriginal({
+        rateOption: cachedProfile.weight_goal_rate || 'moderate',
+        customRate: cachedProfile.weight_goal_custom_rate ? String(cachedProfile.weight_goal_custom_rate) : '',
+        goalType: cachedProfile.weight_goal_type || null,
       });
-  }, []);
-
-  // Fetch profile data when component mounts
-  useEffect(() => {
-    fetchProfileData();
-  }, [fetchProfileData]);
-
-  // Re-fetch profile data when energy target changes (indicates activity level or other profile changes)
-  useEffect(() => {
-    if (energyTarget) {
-      fetchProfileData();
     }
-  }, [energyTarget, fetchProfileData]);
+  }, [cachedProfile]);
 
-  // Re-fetch profile data when profile refresh trigger changes (indicates weight goal changes)
-  useEffect(() => {
-    if (profileRefreshTrigger) {
-      fetchProfileData();
-    }
-  }, [profileRefreshTrigger, fetchProfileData]);
+  // Note: Profile data is now synced via cachedProfile from AuthProvider
+  // The useEffects above will update when user.profile changes
 
   // Auto-update weight_goal_type when goalDirection changes to 'maintaining'
   useEffect(() => {

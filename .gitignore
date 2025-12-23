@@ -31,6 +31,7 @@ CLAUDE.md
 
 # Debug and temporary files
 /backend/debug_screenshots/
+/backend/cleanup_old_foods.py
 /backend/pageClickDropDown.html
 /backend/pageClickNutrition.html
 /backend/pageLoad.html

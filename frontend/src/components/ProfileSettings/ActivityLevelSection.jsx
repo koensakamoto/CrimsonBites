@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Info, CheckCircle2 } from 'lucide-react';
 import { ProfileInfoTooltip } from './ProfileInfoTooltip';
+import { useAuth } from '../../AuthProvider';
 
 const activityLevels = [
   { id: "sedentary", label: "Sedentary", description: "Little to no exercise, desk job", multiplier: 1.2 },
@@ -11,31 +12,24 @@ const activityLevels = [
 ];
 
 export const ActivityLevelSection = ({ energyTarget, refreshEnergyTarget, triggerProfileRefresh }) => {
-  const [selectedLevel, setSelectedLevel] = useState(null);
-  const [originalLevel, setOriginalLevel] = useState(null);
+  const { user, updateUserProfile } = useAuth();
+  const cachedLevel = user?.profile?.activity_level || 'moderate';
+
+  const [selectedLevel, setSelectedLevel] = useState(cachedLevel);
+  const [originalLevel, setOriginalLevel] = useState(cachedLevel);
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [showTooltip, setShowTooltip] = useState(false);
 
+  // Sync with cached profile when it changes
   useEffect(() => {
-    fetch('/api/profile', { credentials: 'include' })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        return res.json();
-      })
-      .then(data => {
-        const level = data.profile.activity_level || 'moderate';
-        setSelectedLevel(level);
-        setOriginalLevel(level);
-        setFetchError(null);
-      })
-      .catch(err => {
-        setFetchError('Could not load profile.');
-        setSelectedLevel('moderate');
-        setOriginalLevel('moderate');
-      });
-  }, []);
+    if (user?.profile?.activity_level) {
+      const level = user.profile.activity_level;
+      setSelectedLevel(level);
+      setOriginalLevel(level);
+    }
+  }, [user?.profile?.activity_level]);
 
   const handleChange = (e) => {
     const newLevel = e.target.id;
@@ -57,6 +51,7 @@ export const ActivityLevelSection = ({ energyTarget, refreshEnergyTarget, trigge
       setShowSaveButton(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+      updateUserProfile({ activity_level: selectedLevel });
       if (refreshEnergyTarget) refreshEnergyTarget();
       if (triggerProfileRefresh) triggerProfileRefresh();
       
