@@ -177,8 +177,8 @@ const Dashboard = ({
 
   // Load plate on date change
   useEffect(() => {
+    // Guest users don't have saved plates - skip fetching but don't clear existing items
     if (user && user.guest) {
-      setTrackedItems([]);
       setPlateLoading(false);
       return;
     }
