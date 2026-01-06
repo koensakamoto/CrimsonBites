@@ -153,6 +153,7 @@ export default function App() {
           <Route
             path="dashboard"
             element={
+              <PrivateRoute>
               <div className="flex flex-col lg:flex-row w-full flex-grow p-2 sm:p-4 gap-2 sm:gap-4">
                 <Dashboard
                   addToTracker={addToTracker}
@@ -188,6 +189,7 @@ export default function App() {
                   />
                 </div>
               </div>
+              </PrivateRoute>
             }
           />
           
