@@ -27,9 +27,19 @@ function getLocalDateString(date) {
   return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
 }
 
+// Wrapper that waits for auth check but allows guests to access
+function AuthReady({ children }) {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+  return children;
+}
+
 // Add a PrivateRoute component for authenticated, non-guest users
 function PrivateRoute({ children }) {
-  const { user, loading, error } = useAuth(); 
+  const { user, loading } = useAuth();
 
   if(loading){
     return <div>Loading...</div>;
@@ -153,7 +163,7 @@ export default function App() {
           <Route
             path="dashboard"
             element={
-              <PrivateRoute>
+              <AuthReady>
               <div className="flex flex-col lg:flex-row w-full flex-grow p-2 sm:p-4 gap-2 sm:gap-4">
                 <Dashboard
                   addToTracker={addToTracker}
@@ -189,10 +199,10 @@ export default function App() {
                   />
                 </div>
               </div>
-              </PrivateRoute>
+              </AuthReady>
             }
           />
-          
+
           <Route path="profile" element={<PrivateRoute><Suspense fallback={<LoadingSpinner />}><ProfileSettings /></Suspense></PrivateRoute>} />
           <Route path="account" element={<PrivateRoute><Suspense fallback={<LoadingSpinner />}><UserAccount /></Suspense></PrivateRoute>} />
           <Route path="history" element={<PrivateRoute><Suspense fallback={<LoadingSpinner />}><NutritionHistory cache={nutritionHistoryCache} setCache={setNutritionHistoryCache} version={nutritionHistoryVersion} /></Suspense></PrivateRoute>} />
