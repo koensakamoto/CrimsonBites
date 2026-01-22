@@ -4,7 +4,7 @@ import { AccountManagementSection } from './AccountManagementSection';
 
 export default function UserAccount(props) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl px-4 sm:px-6 lg:px-8 py-8 lg:py-12 mx-auto">
         {/* Header */}
         <div className="mb-6 lg:mb-8">
