@@ -147,17 +147,8 @@ export const AllergensSection = () => {
         onClose={() => setShowTooltip(false)}
         section="allergens"
       />
-      <div className="border border-orange-200 rounded-xl p-4 mb-6 bg-orange-50/30">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5">
-            <AlertTriangle className="h-5 w-5 text-orange-500" strokeWidth={2} aria-hidden="true" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm text-gray-700 font-medium">
-              For severe allergies, notify dining staff directly.
-            </p>
-          </div>
-        </div>
+      <div className="bg-amber-50 border border-amber-200 p-3 mb-5 text-sm text-gray-700">
+        <strong>Note:</strong> This app can't guarantee complete allergen info. Talk to staff if you have serious allergies.
       </div>
       <p className="text-gray-600 mb-6">
         Select allergies or intolerances to flag unsafe foods.
